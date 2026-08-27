@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sunday Social Run Club — Check In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0a0a0d;
+    --card:#151519;
+    --card-border:#26262e;
+    --green:#39ff14;
+    --pink:#ff2fd0;
+    --text:#f5f5f2;
+    --text-dim:#9d9da8;
+    --input-bg:#0f0f13;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding:0 0 60px 0;
+    position:relative;
+  }
+  .lane-strip{
+    height:10px;
+    width:100%;
+    background:repeating-linear-gradient(
+      120deg,
+      var(--green) 0px, var(--green) 26px,
+      var(--pink) 26px, var(--pink) 52px
+    );
+  }
+  .wrap{
+    max-width:480px;
+    margin:0 auto;
+    padding:28px 20px 0 20px;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--pink);
+    font-weight:800;
+    margin:0 0 6px 0;
+  }
+  h1{
+    font-size:30px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    line-height:1.05;
+    margin:0 0 4px 0;
+    font-style:italic;
+    background:linear-gradient(90deg,var(--green),var(--pink));
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  .sub{
+    color:var(--text-dim);
+    font-size:14px;
+    margin:0 0 22px 0;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    background:var(--input-bg);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    margin-bottom:16px;
+    cursor:pointer;
+  }
+  .toggle-row input{width:18px;height:18px;accent-color:var(--green);}
+  .toggle-row label{font-size:14px;font-weight:700;cursor:pointer;flex:1;}
+  label.field-label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin:14px 0 6px 0;
+  }
+  input[type=text],input[type=tel],input[type=date],input[type=password],select{
+    width:100%;
+    background:var(--input-bg);
+    border:1.5px solid var(--card-border);
+    color:var(--text);
+    padding:12px 14px;
+    border-radius:10px;
+    font-size:15px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input[type=text]:focus,input[type=tel]:focus,input[type=date]:focus,input[type=password]:focus,select:focus{
+    border-color:var(--green);
+  }
+  input[type=date]{color-scheme:dark;}
+  .autocomplete-wrap{position:relative;}
+  .ac-list{
+    position:absolute;
+    top:calc(100% + 4px);
+    left:0;right:0;
+    background:#1c1c22;
+    border:1.5px solid var(--card-border);
+    border-radius:10px;
+    max-height:180px;
+    overflow-y:auto;
+    z-index:20;
+    display:none;
+  }
+  .ac-item{
+    padding:10px 14px;
+    font-size:14px;
+    cursor:pointer;
+    border-bottom:1px solid #26262e;
+  }
+  .ac-item:last-child{border-bottom:none;}
+  .ac-item:hover, .ac-item.active{background:#26262e;}
+  .ac-item .ac-meta{color:var(--text-dim);font-size:11px;margin-top:2px;}
+  select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--pink) 50%),linear-gradient(135deg,var(--pink) 50%,transparent 50%);background-position:calc(100% - 20px) center,calc(100% - 15px) center;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+  .tc-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    margin-top:18px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+  .tc-row input{margin-top:3px;width:17px;height:17px;flex-shrink:0;accent-color:var(--pink);}
+  .tc-row a{color:var(--green);text-decoration:underline;cursor:pointer;font-weight:700;}
+  button.primary{
+    width:100%;
+    margin-top:20px;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:900;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    font-style:italic;
+    cursor:pointer;
+    background:var(--green);
+    color:#08130a;
+    transition:transform .1s, opacity .15s;
+  }
+  button.primary:disabled{opacity:.35;cursor:not-allowed;}
+  button.primary:not(:disabled):active{transform:scale(0.98);}
+  button.ghost{
+    width:100%;
+    margin-top:10px;
+    padding:12px;
+    border:1.5px solid var(--card-border);
+    border-radius:10px;
+    background:transparent;
+    color:var(--text-dim);
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .other-field{display:none;}
+  .msg{
+    border-radius:10px;
+    padding:14px 16px;
+    font-size:14px;
+    margin-bottom:16px;
+    font-weight:600;
+  }
+  .msg.error{background:rgba(255,47,208,.1);border:1px solid var(--pink);color:var(--pink);}
+  .msg.info{background:rgba(57,255,20,.08);border:1px solid var(--green);color:var(--green);}
+  .success-screen{text-align:center;padding:30px 10px 10px 10px;}
+  .bib{
+    width:120px;height:120px;
+    border-radius:50%;
+    border:3px solid var(--green);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 18px auto;
+    background:radial-gradient(circle at 30% 20%, rgba(57,255,20,.15), transparent 60%);
+  }
+  .bib .num{font-size:34px;font-weight:900;font-style:italic;color:var(--green);line-height:1;}
+  .bib .lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-dim);margin-top:4px;}
+  .success-name{font-size:22px;font-weight:900;font-style:italic;margin-bottom:6px;}
+  .success-sub{color:var(--text-dim);font-size:14px;margin-bottom:22px;}
+  footer{
+    max-width:480px;
+    margin:30px auto 0 auto;
+    padding:0 20px;
+    display:flex;
+    justify-content:center;
+    gap:18px;
+  }
+  footer a{
+    color:var(--text-dim);
+    font-size:12px;
+    text-decoration:none;
+    border-bottom:1px dotted var(--text-dim);
+    cursor:pointer;
+  }
+  /* modal */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.75);
+    display:none;align-items:flex-end;justify-content:center;z-index:100;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:18px 18px 0 0;
+    max-width:480px;width:100%;
+    max-height:85vh;
+    overflow-y:auto;
+    padding:22px 20px 28px 20px;
+  }
+  @media(min-width:540px){
+    .modal-overlay{align-items:center;}
+    .modal{border-radius:16px;}
+  }
+  .modal h2{
+    font-size:19px;font-weight:900;font-style:italic;margin:0 0 12px 0;
+    color:var(--green);
+  }
+  .modal p, .modal li{font-size:13.5px;line-height:1.6;color:var(--text-dim);}
+  .modal strong{color:var(--text);}
+  .modal-close{
+    display:block;width:100%;margin-top:18px;padding:12px;
+    border-radius:10px;border:1.5px solid var(--card-border);
+    background:transparent;color:var(--text);font-weight:800;cursor:pointer;
+  }
+  /* admin */
+  .admin-gate{max-width:340px;margin:60px auto 0 auto;padding:0 20px;text-align:center;}
+  .admin-gate .card{text-align:left;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--card-border);}
+  th{color:var(--pink);text-transform:uppercase;font-size:10px;letter-spacing:.06em;}
+  .table-wrap{overflow-x:auto;max-height:360px;overflow-y:auto;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;background:rgba(57,255,20,.12);color:var(--green);font-weight:800;font-size:11px;}
+  .admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .admin-title{font-size:20px;font-weight:900;font-style:italic;}
+  .tab-row{display:flex;gap:8px;margin-bottom:14px;}
+  .tab-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--card-border);background:var(--input-bg);color:var(--text-dim);font-weight:800;font-size:12px;cursor:pointer;text-transform:uppercase;}
+  .tab-btn.active{border-color:var(--green);color:var(--green);}
+  .stat-row{display:flex;gap:10px;margin-bottom:14px;}
+  .stat-box{flex:1;background:var(--input-bg);border:1px solid var(--card-border);border-radius:10px;padding:12px;text-align:center;}
+  .stat-box .n{font-size:22px;font-weight:900;color:var(--pink);}
+  .stat-box .l{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+  #qrbox{background:#fff;padding:16px;border-radius:12px;display:inline-block;margin-top:10px;}
+  input#searchBox{margin-bottom:10px;}
+  .loading{color:var(--text-dim);font-size:13px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+
+<div class="lane-strip"></div>
+
+<!-- ============ CHECK-IN SCREEN ============ -->
+<div class="wrap" id="checkinScreen">
+  <p class="eyebrow">Sunday · 7:00am · Every week</p>
+  <h1>Social Run Club</h1>
+  <p class="sub">Scan, tick a couple of boxes, run. Takes about 20 seconds.</p>
+
+  <div id="msgArea"></div>
+
+  <div class="card" id="formCard">
+    <div class="toggle-row" id="returningToggleRow">
+      <input type="checkbox" id="returningCheck" />
+      <label for="returningCheck">I've run with the club before</label>
+    </div>
+
+    <!-- Returning runner block -->
+    <div id="returningBlock" style="display:none;">
+      <label class="field-label">Find your name</label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="returningName" placeholder="Start typing your name…" autocomplete="off" />
+        <div class="ac-list" id="acList"></div>
+      </div>
+      <div id="returningSelectedInfo" style="display:none;margin-top:10px;font-size:13px;color:var(--text-dim);"></div>
+      <button class="primary" id="returningSubmitBtn" disabled>Check In</button>
+    </div>
+
+    <!-- New runner block -->
+    <div id="newBlock">
+      <label class="field-label">Name</label>
+      <input type="text" id="newName" placeholder="Full name" />
+
+      <label class="field-label">Phone</label>
+      <input type="tel" id="newPhone" placeholder="04xx xxx xxx" />
+
+      <label class="field-label">Email</label>
+      <input type="text" id="newEmail" placeholder="you@example.com" />
+
+      <label class="field-label">Emergency contact — name</label>
+      <input type="text" id="emName" placeholder="Emergency contact name" />
+
+      <label class="field-label">Emergency contact — phone</label>
+      <input type="tel" id="emPhone" placeholder="Emergency contact phone" />
+
+      <label class="field-label">How did you hear about us?</label>
+      <select id="howHeard">
+        <option value="">Select an option…</option>
+        <option value="Social media">Social media</option>
+        <option value="Goodlife">Goodlife</option>
+        <option value="Word of mouth">Word of mouth</option>
+        <option value="Other">Other</option>
+      </select>
+      <div class="other-field" id="otherFieldWrap">
+        <label class="field-label">Please specify</label>
+        <input type="text" id="howHeardOther" placeholder="Tell us more" />
+      </div>
+
+      <div class="tc-row">
+        <input type="checkbox" id="tcCheck" />
+        <label for="tcCheck">I accept the <a id="tcLink">Terms &amp; Conditions</a>, including that I run at my own risk.</label>
+      </div>
+
+      <button class="primary" id="newSubmitBtn" disabled>Check In &amp; Join the Club</button>
+    </div>
+  </div>
+
+  <footer>
+    <a id="showAdminLink">Admin</a>
+    <a id="showQrLink">Show QR</a>
+  </footer>
+</div>
+
+<!-- ============ SUCCESS SCREEN ============ -->
+<div class="wrap" id="successScreen" style="display:none;">
+  <div class="card success-screen">
+    <div class="bib">
+      <div class="num" id="successCount">1</div>
+      <div class="lbl">Runs Logged</div>
+    </div>
+    <div class="success-name" id="successName">Welcome!</div>
+    <div class="success-sub" id="successSub">You're checked in for today. Have a great run 🏃</div>
+    <button class="ghost" id="backBtn">Back to start</button>
+  </div>
+</div>
+
+<!-- ============ ADMIN SCREEN ============ -->
+<div class="admin-gate" id="adminGate">
+  <h1 style="font-size:24px;">Admin Login</h1>
+  <div class="card">
+    <label class="field-label">Email</label>
+    <input type="text" id="adminEmail" placeholder="you@runclub.com" autocomplete="username" />
+    <label class="field-label">Password</label>
+    <input type="password" id="adminPass" placeholder="Enter your password" autocomplete="current-password" />
+    <div id="adminError" style="color:var(--pink);font-size:12px;margin-top:8px;display:none;"></div>
+    <button class="primary" id="adminLoginBtn">Log In</button>
+    <button class="ghost" id="adminBackBtn">Back to check-in</button>
+  </div>
+</div>
+
+<div class="wrap" id="adminScreen" style="display:none;">
+  <div class="admin-header">
+    <div class="admin-title">Club Dashboard</div>
+    <a id="adminLogoutLink" style="color:var(--text-dim);font-size:12px;cursor:pointer;">Log out</a>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-box"><div class="n" id="statRunners">–</div><div class="l">Total Runners</div></div>
+    <div class="stat-box"><div class="n" id="statToday">–</div><div class="l">Checked In Today</div></div>
+    <div class="stat-box"><div class="n" id="statTotal">–</div><div class="l">Total Check-ins</div></div>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="tabRunnersBtn">Runners</button>
+    <button class="tab-btn" id="tabLogBtn">Log</button>
+    <button class="tab-btn" id="tabManualBtn">Add Past</button>
+    <button class="tab-btn" id="tabQrBtn">QR</button>
+  </div>
+
+  <div class="card" id="tabRunnersPane">
+    <input type="text" id="searchBox" placeholder="Search runners…" />
+    <div class="table-wrap"><div id="runnersTableWrap" class="loading">Loading…</div></div>
+    <button class="ghost" id="exportRunnersBtn">Export runners (CSV)</button>
+  </div>
+
+  <div class="card" id="tabLogPane" style="display:none;">
+    <div class="table-wrap"><div id="logTableWrap" class="loading">Loading…</div></div>
+    <button class="ghost" id="exportLogBtn">Export log (CSV)</button>
+  </div>
+
+  <div class="card" id="tabQrPane" style="display:none;text-align:center;">
+    <p style="color:var(--text-dim);font-size:13px;">Print this or display it on a screen at the meet-up point. Runners scan it to open the check-in page.</p>
+    <div id="qrbox"></div>
+  </div>
+
+  <div class="card" id="tabManualPane" style="display:none;">
+    <p style="color:var(--text-dim);font-size:13px;margin-top:0;">Add a check-in for a member who forgot to scan on the day. This updates their run count and appears in the log.</p>
+    <label class="field-label">Runner</label>
+    <div class="autocomplete-wrap">
+      <input type="text" id="manualName" placeholder="Start typing a name…" autocomplete="off" />
+      <div class="ac-list" id="manualAcList"></div>
+    </div>
+    <label class="field-label">Date</label>
+    <input type="date" id="manualDate" />
+    <div id="manualMsg"></div>
+    <button class="primary" id="manualAddBtn" disabled>Add to Log</button>
+  </div>
+</div>
+
+<!-- ============ T&C MODAL ============ -->
+<div class="modal-overlay" id="tcModalOverlay">
+  <div class="modal">
+    <h2>Terms &amp; Conditions</h2>
+    <p><strong>Participation at your own risk.</strong> Sunday Social Run Club is a casual, community-organised run. By checking in, you confirm you are physically able to take part and that you take part entirely at your own risk. The club, its coaches and volunteers are not liable for any injury, loss or damage that may occur before, during or after a run.</p>
+    <p><strong>Medical information.</strong> You agree to disclose to the coach, before the run starts, any medical condition that could affect your safety or that the coach should be aware of — for example asthma, heart conditions, allergies, diabetes, or anything else relevant in an emergency.</p>
+    <p><strong>Emergency care.</strong> You accept that if the coach or a volunteer believes it is necessary, an ambulance or other emergency services may be called on your behalf, and you consent to this.</p>
+    <p><strong>Your details.</strong> The information you provide (name, phone, email, emergency contact, attendance history) is used to run the club safely — including contacting you in an emergency and tracking attendance — and is kept private, accessible only to club admin.</p>
+    <p><strong>Marketing communications.</strong> By checking in, you also agree that the club may contact you by email or phone with updates, event announcements, and other run club news. You can opt out of these communications at any time by letting the coach know or replying to any message we send you — this won't affect your ability to keep running with the club.</p>
+    <p><strong>General conduct.</strong> Please run within your ability, follow the coach's directions, and look out for fellow runners. The club reserves the right to refuse entry to anyone who does not accept these terms.</p>
+    <button class="modal-close" id="tcModalClose">Close</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   The anon/public key is DESIGNED to be exposed in frontend code —
+   it can only do what your Row Level Security policies and RPC
+   function grants allow it to do. Never put your service_role key
+   here.
+============================================================ */
+const SUPABASE_URL = "https://hkqabjpajdhxegzdpbrr.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrcWFianBhamRoeGVnemRwYnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTgxMDUsImV4cCI6MjEwMzM5NDEwNX0.eiFmr_m9bEQcKWyWmjNlqt4xyzDTJbXGfZu4JgGBDnU";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function slugify(name){
+  return name.trim().toLowerCase()
+    .replace(/\s+/g,"-")
+    .replace(/[^a-z0-9\-]/g,"");
+}
+function fmtDate(iso){
+  const d = new Date(iso+"T00:00:00");
+  return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+}
+function esc(s){
+  return (s||"").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function showMsg(text, type){
+  const area = document.getElementById("msgArea");
+  area.innerHTML = `<div class="msg ${type}">${esc(text)}</div>`;
+}
+function clearMsg(){ document.getElementById("msgArea").innerHTML = ""; }
+
+/* ============================================================
+   CHECK-IN SCREEN LOGIC
+============================================================ */
+const returningCheck = document.getElementById("returningCheck");
+const returningBlock = document.getElementById("returningBlock");
+const newBlock = document.getElementById("newBlock");
+const returningName = document.getElementById("returningName");
+const acList = document.getElementById("acList");
+const returningSubmitBtn = document.getElementById("returningSubmitBtn");
+const returningSelectedInfo = document.getElementById("returningSelectedInfo");
+let selectedSlug = null;
+
+returningCheck.addEventListener("change", () => {
+  clearMsg();
+  if(returningCheck.checked){
+    returningBlock.style.display = "block";
+    newBlock.style.display = "none";
+  }else{
+    returningBlock.style.display = "none";
+    newBlock.style.display = "block";
+    selectedSlug = null;
+    returningSubmitBtn.disabled = true;
+    returningSelectedInfo.style.display = "none";
+  }
+});
+
+returningName.addEventListener("input", async () => {
+  const q = returningName.value.trim();
+  selectedSlug = null;
+  returningSubmitBtn.disabled = true;
+  returningSelectedInfo.style.display = "none";
+  if(q.length === 0){ acList.style.display = "none"; return; }
+  // search_runners() only ever returns name + slug — never phone, email,
+  // or emergency contact details — so this lookup is safe to run publicly.
+  const { data, error } = await sb.rpc("search_runners", { p_query: q });
+  const matches = error ? [] : data;
+  if(!matches || matches.length === 0){
+    acList.innerHTML = `<div class="ac-item" style="color:var(--text-dim);cursor:default;">No matches — uncheck the box above to join as a new runner</div>`;
+    acList.style.display = "block";
+    return;
+  }
+  acList.innerHTML = matches.map(m =>
+    `<div class="ac-item" data-slug="${esc(m.slug)}" data-name="${esc(m.name)}">${esc(m.name)}</div>`
+  ).join("");
+  acList.style.display = "block";
+});
+
+acList.addEventListener("click", (e) => {
+  const item = e.target.closest(".ac-item");
+  if(!item || !item.dataset.slug) return;
+  selectedSlug = item.dataset.slug;
+  returningName.value = item.dataset.name;
+  acList.style.display = "none";
+  returningSubmitBtn.disabled = false;
+  returningSelectedInfo.style.display = "block";
+  returningSelectedInfo.textContent = `Selected: ${item.dataset.name}. Tap Check In to confirm.`;
+});
+
+document.addEventListener("click", (e) => {
+  if(!e.target.closest(".autocomplete-wrap")) acList.style.display = "none";
+});
+
+returningSubmitBtn.addEventListener("click", async () => {
+  if(!selectedSlug) return;
+  returningSubmitBtn.disabled = true;
+  returningSubmitBtn.textContent = "Checking in…";
+  try{
+    // All the logic (max-one-per-day, incrementing the count, writing the
+    // log) happens inside this one database function call.
+    const { data, error } = await sb.rpc("check_in_runner", { p_slug: selectedSlug });
+    if(error) throw error;
+    const row = data && data[0];
+    if(!row){
+      showMsg("We couldn't find that runner's record. Please try again or register as new.", "error");
+      returningSubmitBtn.disabled = false;
+      returningSubmitBtn.textContent = "Check In";
+      return;
+    }
+    showSuccess(row.name, row.total_attendances, row.status === "already");
+  }catch(err){
+    showMsg("Something went wrong saving your check-in. Please try again.", "error");
+    returningSubmitBtn.disabled = false;
+    returningSubmitBtn.textContent = "Check In";
+  }
+});
+
+/* New runner form */
+const howHeard = document.getElementById("howHeard");
+const otherFieldWrap = document.getElementById("otherFieldWrap");
+howHeard.addEventListener("change", () => {
+  otherFieldWrap.style.display = howHeard.value === "Other" ? "block" : "none";
+});
+
+const newName = document.getElementById("newName");
+const newPhone = document.getElementById("newPhone");
+const newEmail = document.getElementById("newEmail");
+const emName = document.getElementById("emName");
+const emPhone = document.getElementById("emPhone");
+const howHeardOther = document.getElementById("howHeardOther");
+const tcCheck = document.getElementById("tcCheck");
+const newSubmitBtn = document.getElementById("newSubmitBtn");
+
+function validateNewForm(){
+  const emailOk = /^\S+@\S+\.\S+$/.test(newEmail.value.trim());
+  const ok = newName.value.trim() && newPhone.value.trim() && emailOk && emName.value.trim() &&
+    emPhone.value.trim() && howHeard.value && (howHeard.value !== "Other" || howHeardOther.value.trim()) &&
+    tcCheck.checked;
+  newSubmitBtn.disabled = !ok;
+}
+[newName,newPhone,newEmail,emName,emPhone,howHeard,howHeardOther,tcCheck].forEach(el=>{
+  el.addEventListener("input", validateNewForm);
+  el.addEventListener("change", validateNewForm);
+});
+
+newSubmitBtn.addEventListener("click", async () => {
+  clearMsg();
+  const name = newName.value.trim();
+  const slug = slugify(name);
+  newSubmitBtn.disabled = true;
+  newSubmitBtn.textContent = "Checking in…";
+  try{
+    const { error } = await sb.rpc("register_runner", {
+      p_slug: slug,
+      p_name: name,
+      p_phone: newPhone.value.trim(),
+      p_email: newEmail.value.trim(),
+      p_emergency_name: emName.value.trim(),
+      p_emergency_phone: emPhone.value.trim(),
+      p_how_heard: howHeard.value === "Other" ? ("Other: " + howHeardOther.value.trim()) : howHeard.value
+    });
+    if(error){
+      if(/already registered/i.test(error.message)){
+        showMsg(`Looks like ${name} is already registered. Tick "I've run with the club before" and select your name instead.`, "error");
+      }else{
+        throw error;
+      }
+      newSubmitBtn.disabled = false;
+      newSubmitBtn.textContent = "Check In & Join the Club";
+      return;
+    }
+    showSuccess(name, 1, false, true);
+  }catch(err){
+    showMsg("Something went wrong saving your details. Please try again.", "error");
+    newSubmitBtn.disabled = false;
+    newSubmitBtn.textContent = "Check In & Join the Club";
+  }
+});
+
+function showSuccess(name, count, alreadyToday, brandNew){
+  document.getElementById("checkinScreen").style.display = "none";
+  document.getElementById("successScreen").style.display = "block";
+  document.getElementById("successCount").textContent = count;
+  document.getElementById("successName").textContent = brandNew ? `Welcome, ${name}!` : `Nice one, ${name}!`;
+  document.getElementById("successSub").textContent = alreadyToday
+    ? "Looks like you're already checked in for today. See you out there!"
+    : "You're checked in for today. Have a great run \ud83c\udfc3";
+}
+
+document.getElementById("backBtn").addEventListener("click", () => resetCheckin());
+
+function resetCheckin(){
+  document.getElementById("successScreen").style.display = "none";
+  document.getElementById("checkinScreen").style.display = "block";
+  clearMsg();
+  returningCheck.checked = false;
+  returningBlock.style.display = "none";
+  newBlock.style.display = "block";
+  returningName.value = "";
+  selectedSlug = null;
+  returningSubmitBtn.disabled = true;
+  returningSubmitBtn.textContent = "Check In";
+  returningSelectedInfo.style.display = "none";
+  [newName,newPhone,newEmail,emName,emPhone,howHeardOther].forEach(el=>el.value="");
+  howHeard.value = "";
+  otherFieldWrap.style.display = "none";
+  tcCheck.checked = false;
+  newSubmitBtn.disabled = true;
+  newSubmitBtn.textContent = "Check In & Join the Club";
+}
+
+/* T&C modal */
+document.getElementById("tcLink").addEventListener("click", () => {
+  document.getElementById("tcModalOverlay").classList.add("open");
+});
+document.getElementById("tcModalClose").addEventListener("click", () => {
+  document.getElementById("tcModalOverlay").classList.remove("open");
+});
+document.getElementById("tcModalOverlay").addEventListener("click", (e) => {
+  if(e.target.id === "tcModalOverlay") document.getElementById("tcModalOverlay").classList.remove("open");
+});
+
+/* ============================================================
+   ADMIN LOGIN (real Supabase Auth — email + password, checked
+   server-side, session enforced by Row Level Security)
+============================================================ */
+const adminGate = document.getElementById("adminGate");
+const adminScreen = document.getElementById("adminScreen");
+const checkinScreen = document.getElementById("checkinScreen");
+const adminEmail = document.getElementById("adminEmail");
+const adminPass = document.getElementById("adminPass");
+const adminError = document.getElementById("adminError");
+
+async function goToAdmin(){
+  checkinScreen.style.display = "none";
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){
+    adminGate.style.display = "none";
+    adminScreen.style.display = "block";
+    loadAdminData();
+  }else{
+    adminGate.style.display = "block";
+  }
+}
+
+document.getElementById("showAdminLink").addEventListener("click", goToAdmin);
+document.getElementById("showQrLink").addEventListener("click", goToAdmin);
+
+document.getElementById("adminBackBtn").addEventListener("click", () => {
+  adminGate.style.display = "none";
+  checkinScreen.style.display = "block";
+});
+
+document.getElementById("adminLoginBtn").addEventListener("click", async () => {
+  adminError.style.display = "none";
+  const btn = document.getElementById("adminLoginBtn");
+  btn.disabled = true;
+  btn.textContent = "Logging in…";
+  const { error } = await sb.auth.signInWithPassword({
+    email: adminEmail.value.trim(),
+    password: adminPass.value
+  });
+  btn.disabled = false;
+  btn.textContent = "Log In";
+  if(error){
+    adminError.textContent = "Login failed — check your email and password.";
+    adminError.style.display = "block";
+    return;
+  }
+  adminPass.value = "";
+  adminGate.style.display = "none";
+  adminScreen.style.display = "block";
+  loadAdminData();
+});
+
+document.getElementById("adminLogoutLink").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  adminScreen.style.display = "none";
+  adminEmail.value = "";
+  adminPass.value = "";
+  checkinScreen.style.display = "block";
+});
+
+/* Tabs */
+const tabRunnersBtn = document.getElementById("tabRunnersBtn");
+const tabLogBtn = document.getElementById("tabLogBtn");
+const tabManualBtn = document.getElementById("tabManualBtn");
+const tabQrBtn = document.getElementById("tabQrBtn");
+const tabRunnersPane = document.getElementById("tabRunnersPane");
+const tabLogPane = document.getElementById("tabLogPane");
+const tabManualPane = document.getElementById("tabManualPane");
+const tabQrPane = document.getElementById("tabQrPane");
+function setTab(which){
+  [tabRunnersBtn,tabLogBtn,tabManualBtn,tabQrBtn].forEach(b=>b.classList.remove("active"));
+  [tabRunnersPane,tabLogPane,tabManualPane,tabQrPane].forEach(p=>p.style.display="none");
+  if(which==="runners"){ tabRunnersBtn.classList.add("active"); tabRunnersPane.style.display="block"; }
+  if(which==="log"){ tabLogBtn.classList.add("active"); tabLogPane.style.display="block"; }
+  if(which==="manual"){ tabManualBtn.classList.add("active"); tabManualPane.style.display="block"; }
+  if(which==="qr"){ tabQrBtn.classList.add("active"); tabQrPane.style.display="block"; renderQr(); }
+}
+tabRunnersBtn.addEventListener("click", ()=>setTab("runners"));
+tabLogBtn.addEventListener("click", ()=>setTab("log"));
+tabManualBtn.addEventListener("click", ()=>setTab("manual"));
+tabQrBtn.addEventListener("click", ()=>setTab("qr"));
+
+let allRunnersData = [];
+let allLogData = [];
+
+async function loadAdminData(){
+  document.getElementById("runnersTableWrap").innerHTML = `<div class="loading">Loading runners…</div>`;
+  document.getElementById("logTableWrap").innerHTML = `<div class="loading">Loading log…</div>`;
+
+  // These two direct table reads only succeed because Row Level Security
+  // allows SELECT to authenticated users — anon visitors get nothing back.
+  const [runnersRes, logRes] = await Promise.all([
+    sb.from("runners").select("*"),
+    sb.from("attendance_log").select("*")
+  ]);
+
+  const runners = (runnersRes.data || []).slice();
+  runners.sort((a,b) => (b.total_attendances||0) - (a.total_attendances||0));
+  allRunnersData = runners;
+
+  const log = (logRes.data || []).slice();
+  log.sort((a,b) => new Date(b.time) - new Date(a.time));
+  allLogData = log;
+
+  const today = todayStr();
+  document.getElementById("statRunners").textContent = runners.length;
+  document.getElementById("statToday").textContent = runners.filter(r => r.last_attended === today).length;
+  document.getElementById("statTotal").textContent = log.length;
+
+  renderRunnersTable(runners);
+  renderLogTable(log);
+  document.getElementById("manualDate").value = todayStr();
+}
+
+function renderRunnersTable(runners){
+  if(runners.length === 0){
+    document.getElementById("runnersTableWrap").innerHTML = `<p style="color:var(--text-dim);font-size:13px;">No runners yet — check-ins will appear here.</p>`;
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Name</th><th>Phone</th><th>Email</th><th>Emergency</th><th>Heard via</th><th>Joined</th><th>Runs</th>
+  </tr></thead><tbody>`;
+  runners.forEach(r => {
+    html += `<tr>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.phone)}</td>
+      <td>${esc(r.email)}</td>
+      <td>${esc(r.emergency_name)}<br><span style="color:var(--text-dim)">${esc(r.emergency_phone)}</span></td>
+      <td>${esc(r.how_heard)}</td>
+      <td>${esc(r.joined)}</td>
+      <td><span class="pill">${r.total_attendances||0}</span></td>
+    </tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("runnersTableWrap").innerHTML = html;
+}
+
+function renderLogTable(log){
+  if(log.length === 0){
+    document.getElementById("logTableWrap").innerHTML = `<p style="color:var(--text-dim);font-size:13px;">No check-ins logged yet.</p>`;
+    return;
+  }
+  let html = `<table><thead><tr><th>Date</th><th>Name</th><th>Time</th><th>Source</th></tr></thead><tbody>`;
+  log.forEach(entry => {
+    const t = new Date(entry.time);
+    html += `<tr><td>${fmtDate(entry.date)}</td><td>${esc(entry.name)}</td><td>${t.toLocaleTimeString()}</td><td>${entry.added_by_admin ? "Admin" : "Scan"}</td></tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("logTableWrap").innerHTML = html;
+}
+
+document.getElementById("searchBox").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  renderRunnersTable(allRunnersData.filter(r => r.name.toLowerCase().includes(q)));
+});
+
+function downloadCsv(filename, rows){
+  const csv = rows.map(row => row.map(cell => `"${(cell??"").toString().replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById("exportRunnersBtn").addEventListener("click", () => {
+  const rows = [["Name","Phone","Email","Emergency Name","Emergency Phone","How Heard","Joined","Last Attended","Total Attendances"]];
+  allRunnersData.forEach(r => rows.push([r.name,r.phone,r.email,r.emergency_name,r.emergency_phone,r.how_heard,r.joined,r.last_attended,r.total_attendances]));
+  downloadCsv("run-club-runners.csv", rows);
+});
+document.getElementById("exportLogBtn").addEventListener("click", () => {
+  const rows = [["Date","Name","Timestamp","Source"]];
+  allLogData.forEach(l => rows.push([l.date,l.name,l.time, l.added_by_admin ? "Admin" : "Scan"]));
+  downloadCsv("run-club-attendance-log.csv", rows);
+});
+
+/* ============================================================
+   ADMIN: ADD PAST ATTENDANCE
+============================================================ */
+const manualName = document.getElementById("manualName");
+const manualAcList = document.getElementById("manualAcList");
+const manualDate = document.getElementById("manualDate");
+const manualAddBtn = document.getElementById("manualAddBtn");
+const manualMsg = document.getElementById("manualMsg");
+let manualSelectedSlug = null;
+
+function manualValidate(){
+  manualAddBtn.disabled = !(manualSelectedSlug && manualDate.value);
+}
+
+manualName.addEventListener("input", () => {
+  manualSelectedSlug = null;
+  manualValidate();
+  const q = manualName.value.trim().toLowerCase();
+  if(q.length === 0){ manualAcList.style.display = "none"; return; }
+  const matches = allRunnersData.filter(r => r.name.toLowerCase().includes(q)).slice(0, 8);
+  if(matches.length === 0){
+    manualAcList.innerHTML = `<div class="ac-item" style="color:var(--text-dim);cursor:default;">No matching runner found</div>`;
+    manualAcList.style.display = "block";
+    return;
+  }
+  manualAcList.innerHTML = matches.map(m =>
+    `<div class="ac-item" data-slug="${esc(m.slug)}" data-name="${esc(m.name)}">${esc(m.name)}<div class="ac-meta">${m.total_attendances||0} runs logged</div></div>`
+  ).join("");
+  manualAcList.style.display = "block";
+});
+manualAcList.addEventListener("click", (e) => {
+  const item = e.target.closest(".ac-item");
+  if(!item || !item.dataset.slug) return;
+  manualSelectedSlug = item.dataset.slug;
+  manualName.value = item.dataset.name;
+  manualAcList.style.display = "none";
+  manualValidate();
+});
+document.addEventListener("click", (e) => {
+  if(!e.target.closest("#tabManualPane .autocomplete-wrap")) manualAcList.style.display = "none";
+});
+manualDate.addEventListener("change", manualValidate);
+
+manualAddBtn.addEventListener("click", async () => {
+  if(!manualSelectedSlug || !manualDate.value) return;
+  manualMsg.innerHTML = "";
+  manualAddBtn.disabled = true;
+  manualAddBtn.textContent = "Adding…";
+  try{
+    // One RPC call does the duplicate check, the count increment, and the
+    // log insert — and it's only callable by a logged-in admin.
+    const { error } = await sb.rpc("admin_add_attendance", {
+      p_slug: manualSelectedSlug,
+      p_date: manualDate.value
+    });
+    if(error) throw error;
+    const addedName = manualName.value;
+    manualMsg.innerHTML = `<div class="msg info">Added ${esc(addedName)} for ${fmtDate(manualDate.value)}.</div>`;
+    manualName.value = "";
+    manualSelectedSlug = null;
+    manualDate.value = todayStr();
+    manualAddBtn.disabled = true;
+    manualAddBtn.textContent = "Add to Log";
+    loadAdminData();
+  }catch(err){
+    const friendly = /already logged/i.test(err.message || "")
+      ? "Already logged for that date — no changes made."
+      : "Something went wrong — please try again.";
+    manualMsg.innerHTML = `<div class="msg error">${esc(friendly)}</div>`;
+    manualAddBtn.disabled = false;
+    manualAddBtn.textContent = "Add to Log";
+  }
+});
+
+let qrLibPromise = null;
+function loadQrLib(){
+  if(window.QRCode) return Promise.resolve();
+  if(qrLibPromise) return qrLibPromise;
+  qrLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    s.onload = resolve;
+    s.onerror = reject;
+    document.body.appendChild(s);
+    setTimeout(reject, 5000);
+  });
+  return qrLibPromise;
+}
+
+function renderQr(){
+  const box = document.getElementById("qrbox");
+  box.innerHTML = `<p style="color:#0a0a0d;font-size:12px;">Loading QR code…</p>`;
+  loadQrLib().then(() => {
+    box.innerHTML = "";
+    new QRCode(box, {
+      text: window.location.href,
+      width: 220,
+      height: 220,
+      colorDark: "#0a0a0d",
+      colorLight: "#ffffff"
+    });
+  }).catch(() => {
+    box.innerHTML = `<p style="color:#0a0a0d;font-size:12px;">QR code unavailable right now — share this link instead:<br><b>${esc(window.location.href)}</b></p>`;
+  });
+}
+</script>
+</body>
+</html>
