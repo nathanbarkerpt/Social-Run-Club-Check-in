@@ -252,6 +252,19 @@
   th{color:var(--pink);text-transform:uppercase;font-size:10px;letter-spacing:.06em;}
   .table-wrap{overflow-x:auto;max-height:360px;overflow-y:auto;}
   .pill{display:inline-block;padding:2px 8px;border-radius:20px;background:rgba(57,255,20,.12);color:var(--green);font-weight:800;font-size:11px;}
+  .log-delete-btn{
+    background:transparent;
+    border:1.5px solid var(--card-border);
+    color:var(--pink);
+    width:26px;height:26px;
+    border-radius:6px;
+    font-size:13px;
+    font-weight:800;
+    cursor:pointer;
+    line-height:1;
+  }
+  .log-delete-btn:hover{border-color:var(--pink);}
+  .log-delete-btn:disabled{opacity:.4;cursor:not-allowed;}
   .admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
   .admin-title{font-size:20px;font-weight:900;font-style:italic;}
   .tab-row{display:flex;gap:8px;margin-bottom:14px;}
@@ -438,8 +451,8 @@
    function grants allow it to do. Never put your service_role key
    here.
 ============================================================ */
-const SUPABASE_URL = "https://hkqabjpajdhxegzdpbrr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrcWFianBhamRoeGVnemRwYnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTgxMDUsImV4cCI6MjEwMzM5NDEwNX0.eiFmr_m9bEQcKWyWmjNlqt4xyzDTJbXGfZu4JgGBDnU";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ============================================================
@@ -801,14 +814,40 @@ function renderLogTable(log){
     document.getElementById("logTableWrap").innerHTML = `<p style="color:var(--text-dim);font-size:13px;">No check-ins logged yet.</p>`;
     return;
   }
-  let html = `<table><thead><tr><th>Date</th><th>Name</th><th>Time</th><th>Source</th></tr></thead><tbody>`;
+  let html = `<table><thead><tr><th>Date</th><th>Name</th><th>Time</th><th>Source</th><th></th></tr></thead><tbody>`;
   log.forEach(entry => {
     const t = new Date(entry.time);
-    html += `<tr><td>${fmtDate(entry.date)}</td><td>${esc(entry.name)}</td><td>${t.toLocaleTimeString()}</td><td>${entry.added_by_admin ? "Admin" : "Scan"}</td></tr>`;
+    html += `<tr>
+      <td>${fmtDate(entry.date)}</td>
+      <td>${esc(entry.name)}</td>
+      <td>${t.toLocaleTimeString()}</td>
+      <td>${entry.added_by_admin ? "Admin" : "Scan"}</td>
+      <td><button class="log-delete-btn" data-slug="${esc(entry.slug)}" data-date="${esc(entry.date)}" data-name="${esc(entry.name)}" title="Delete this attendance">✕</button></td>
+    </tr>`;
   });
   html += "</tbody></table>";
   document.getElementById("logTableWrap").innerHTML = html;
 }
+
+document.getElementById("logTableWrap").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".log-delete-btn");
+  if(!btn) return;
+  const slug = btn.dataset.slug;
+  const date = btn.dataset.date;
+  const name = btn.dataset.name;
+  if(!confirm(`Delete ${name}'s attendance for ${fmtDate(date)}? This will also reduce their total run count. This can't be undone.`)) return;
+  btn.disabled = true;
+  btn.textContent = "…";
+  try{
+    const { error } = await sb.rpc("admin_delete_attendance", { p_slug: slug, p_date: date });
+    if(error) throw error;
+    loadAdminData();
+  }catch(err){
+    alert("Something went wrong deleting that entry. Please try again.");
+    btn.disabled = false;
+    btn.textContent = "✕";
+  }
+});
 
 document.getElementById("searchBox").addEventListener("input", (e) => {
   const q = e.target.value.trim().toLowerCase();
