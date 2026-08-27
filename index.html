@@ -293,7 +293,6 @@
 
 <!-- ============ CHECK-IN SCREEN ============ -->
 <div class="wrap" id="checkinScreen">
-  <p class="eyebrow">Sunday · 7:00am · Every week</p>
   <h1>Social Run Club</h1>
   <p class="sub">Scan, tick a couple of boxes, run. Takes about 20 seconds.</p>
 
@@ -466,8 +465,8 @@
    function grants allow it to do. Never put your service_role key
    here.
 ============================================================ */
-const SUPABASE_URL = "https://hkqabjpajdhxegzdpbrr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrcWFianBhamRoeGVnemRwYnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTgxMDUsImV4cCI6MjEwMzM5NDEwNX0.eiFmr_m9bEQcKWyWmjNlqt4xyzDTJbXGfZu4JgGBDnU";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ============================================================
@@ -792,22 +791,51 @@ tabQrBtn.addEventListener("click", ()=>setTab("qr"));
 let allRunnersData = [];
 let allLogData = [];
 
+// Supabase's API caps any single request at 1000 rows by default. For a
+// club that runs for years, both tables can eventually exceed that — so
+// this fetches in pages of 1000 and keeps going until it's got everything,
+// rather than silently showing a partial (and increasingly wrong) picture.
+async function fetchAllRows(table, orderColumn){
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while(true){
+    const { data, error } = await sb
+      .from(table)
+      .select("*")
+      .order(orderColumn, { ascending: true })
+      .range(from, from + pageSize - 1);
+    if(error) throw error;
+    all = all.concat(data || []);
+    if(!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 async function loadAdminData(){
   document.getElementById("runnersTableWrap").innerHTML = `<div class="loading">Loading runners…</div>`;
   document.getElementById("logTableWrap").innerHTML = `<div class="loading">Loading log…</div>`;
 
   // These two direct table reads only succeed because Row Level Security
   // allows SELECT to authenticated users — anon visitors get nothing back.
-  const [runnersRes, logRes] = await Promise.all([
-    sb.from("runners").select("*"),
-    sb.from("attendance_log").select("*")
-  ]);
+  // Both are paginated so the dashboard stays accurate no matter how many
+  // runners or check-ins have piled up over the life of the club.
+  let runners, log;
+  try{
+    [runners, log] = await Promise.all([
+      fetchAllRows("runners", "slug"),
+      fetchAllRows("attendance_log", "id")
+    ]);
+  }catch(err){
+    document.getElementById("runnersTableWrap").innerHTML = `<p style="color:var(--pink);font-size:13px;">Couldn't load runner data. Please refresh and try again.</p>`;
+    document.getElementById("logTableWrap").innerHTML = `<p style="color:var(--pink);font-size:13px;">Couldn't load the attendance log. Please refresh and try again.</p>`;
+    return;
+  }
 
-  const runners = (runnersRes.data || []).slice();
   runners.sort((a,b) => (b.total_attendances||0) - (a.total_attendances||0));
   allRunnersData = runners;
 
-  const log = (logRes.data || []).slice();
   log.sort((a,b) => new Date(b.time) - new Date(a.time));
   allLogData = log;
 
