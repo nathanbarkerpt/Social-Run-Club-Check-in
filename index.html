@@ -265,6 +265,14 @@
   }
   .log-delete-btn:hover{border-color:var(--pink);}
   .log-delete-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .merge-check{width:16px;height:16px;accent-color:var(--pink);cursor:pointer;}
+  .merge-choice-row{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 12px;background:var(--input-bg);
+    border:1.5px solid var(--card-border);border-radius:10px;margin-bottom:8px;
+  }
+  .merge-choice-row input{accent-color:var(--pink);width:16px;height:16px;}
+  .merge-choice-row .mc-meta{color:var(--text-dim);font-size:11px;margin-left:auto;}
   .admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
   .admin-title{font-size:20px;font-weight:900;font-style:italic;}
   .tab-row{display:flex;gap:8px;margin-bottom:14px;}
@@ -403,6 +411,13 @@
     <input type="text" id="searchBox" placeholder="Search runners…" />
     <div class="table-wrap"><div id="runnersTableWrap" class="loading">Loading…</div></div>
     <button class="ghost" id="exportRunnersBtn">Export runners (CSV)</button>
+
+    <div id="mergePanel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border);">
+      <p style="color:var(--text-dim);font-size:13px;margin:0 0 10px 0;">These are probably the same person. Pick which profile to keep — its run history will absorb the others.</p>
+      <div id="mergeChoices"></div>
+      <button class="primary" id="confirmMergeBtn">Merge Selected</button>
+      <button class="ghost" id="cancelMergeBtn">Cancel selection</button>
+    </div>
   </div>
 
   <div class="card" id="tabLogPane" style="display:none;">
@@ -558,7 +573,7 @@ returningSubmitBtn.addEventListener("click", async () => {
       returningSubmitBtn.textContent = "Check In";
       return;
     }
-    showSuccess(row.name, row.total_attendances, row.status === "already");
+    showSuccess(row.name, row.total_attendances, row.status === "already", false, row.milestone, row.club_milestone);
   }catch(err){
     showMsg("Something went wrong saving your check-in. Please try again.", "error");
     returningSubmitBtn.disabled = false;
@@ -601,7 +616,7 @@ newSubmitBtn.addEventListener("click", async () => {
   newSubmitBtn.disabled = true;
   newSubmitBtn.textContent = "Checking in…";
   try{
-    const { error } = await sb.rpc("register_runner", {
+    const { data, error } = await sb.rpc("register_runner", {
       p_slug: slug,
       p_name: name,
       p_phone: newPhone.value.trim(),
@@ -620,7 +635,7 @@ newSubmitBtn.addEventListener("click", async () => {
       newSubmitBtn.textContent = "Check In & Join the Club";
       return;
     }
-    showSuccess(name, 1, false, true);
+    showSuccess(name, 1, false, true, null, data);
   }catch(err){
     showMsg("Something went wrong saving your details. Please try again.", "error");
     newSubmitBtn.disabled = false;
@@ -628,14 +643,34 @@ newSubmitBtn.addEventListener("click", async () => {
   }
 });
 
-function showSuccess(name, count, alreadyToday, brandNew){
+function showSuccess(name, count, alreadyToday, brandNew, milestone, clubMilestone){
   document.getElementById("checkinScreen").style.display = "none";
   document.getElementById("successScreen").style.display = "block";
   document.getElementById("successCount").textContent = count;
-  document.getElementById("successName").textContent = brandNew ? `Welcome, ${name}!` : `Nice one, ${name}!`;
-  document.getElementById("successSub").textContent = alreadyToday
-    ? "Looks like you're already checked in for today. See you out there!"
-    : "You're checked in for today. Have a great run \ud83c\udfc3";
+  const bib = document.querySelector(".bib");
+  if(milestone){
+    bib.style.borderColor = "var(--pink)";
+    bib.style.background = "radial-gradient(circle at 30% 20%, rgba(255,47,208,.2), transparent 60%)";
+    document.querySelector(".bib .num").style.color = "var(--pink)";
+    document.getElementById("successName").textContent = `\ud83c\udfc6 Milestone! ${milestone} runs, ${name}!`;
+    document.getElementById("successSub").textContent = clubMilestone
+      ? `That's your ${milestone}th run — AND the club's ${clubMilestone}th check-in ever! See the coach, you've earned something!`
+      : `That's your ${milestone}th run with the club — see the coach, you've earned something!`;
+  }else if(clubMilestone){
+    bib.style.borderColor = "var(--pink)";
+    bib.style.background = "radial-gradient(circle at 30% 20%, rgba(255,47,208,.2), transparent 60%)";
+    document.querySelector(".bib .num").style.color = "var(--pink)";
+    document.getElementById("successName").textContent = `\ud83c\udfc6 ${brandNew ? "Welcome" : "Nice one"}, ${name}!`;
+    document.getElementById("successSub").textContent = `Great timing — you're the club's ${clubMilestone}th check-in ever!`;
+  }else{
+    bib.style.borderColor = "var(--green)";
+    bib.style.background = "radial-gradient(circle at 30% 20%, rgba(57,255,20,.15), transparent 60%)";
+    document.querySelector(".bib .num").style.color = "var(--green)";
+    document.getElementById("successName").textContent = brandNew ? `Welcome, ${name}!` : `Nice one, ${name}!`;
+    document.getElementById("successSub").textContent = alreadyToday
+      ? "Looks like you're already checked in for today. See you out there!"
+      : "You're checked in for today. Have a great run \ud83c\udfc3";
+  }
 }
 
 document.getElementById("backBtn").addEventListener("click", () => resetCheckin());
@@ -792,10 +827,11 @@ function renderRunnersTable(runners){
     return;
   }
   let html = `<table><thead><tr>
-    <th>Name</th><th>Phone</th><th>Email</th><th>Emergency</th><th>Heard via</th><th>Joined</th><th>Runs</th>
+    <th></th><th>Name</th><th>Phone</th><th>Email</th><th>Emergency</th><th>Heard via</th><th>Joined</th><th>Runs</th>
   </tr></thead><tbody>`;
   runners.forEach(r => {
     html += `<tr>
+      <td><input type="checkbox" class="merge-check" data-slug="${esc(r.slug)}" ${mergeSelection.has(r.slug) ? "checked" : ""}></td>
       <td>${esc(r.name)}</td>
       <td>${esc(r.phone)}</td>
       <td>${esc(r.email)}</td>
@@ -809,19 +845,90 @@ function renderRunnersTable(runners){
   document.getElementById("runnersTableWrap").innerHTML = html;
 }
 
+/* ============================================================
+   ADMIN: MERGE DUPLICATE RUNNER PROFILES
+============================================================ */
+let mergeSelection = new Set();
+
+document.getElementById("runnersTableWrap").addEventListener("change", (e) => {
+  const cb = e.target.closest(".merge-check");
+  if(!cb) return;
+  if(cb.checked) mergeSelection.add(cb.dataset.slug);
+  else mergeSelection.delete(cb.dataset.slug);
+  renderMergePanel();
+});
+
+function renderMergePanel(){
+  const panel = document.getElementById("mergePanel");
+  if(mergeSelection.size < 2){
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  const selected = allRunnersData.filter(r => mergeSelection.has(r.slug));
+  // default the pre-selected "keep" choice to whoever has the most runs logged
+  const suggested = selected.slice().sort((a,b) => (b.total_attendances||0)-(a.total_attendances||0))[0];
+  document.getElementById("mergeChoices").innerHTML = selected.map(r => `
+    <label class="merge-choice-row">
+      <input type="radio" name="mergePrimary" value="${esc(r.slug)}" ${r.slug === suggested.slug ? "checked" : ""}>
+      <span>${esc(r.name)}</span>
+      <span class="mc-meta">${r.total_attendances||0} runs · joined ${esc(r.joined)}</span>
+    </label>
+  `).join("");
+}
+
+document.getElementById("cancelMergeBtn").addEventListener("click", () => {
+  mergeSelection.clear();
+  document.getElementById("mergePanel").style.display = "none";
+  renderRunnersTable(allRunnersData);
+});
+
+document.getElementById("confirmMergeBtn").addEventListener("click", async () => {
+  const primaryRadio = document.querySelector('input[name="mergePrimary"]:checked');
+  if(!primaryRadio) return;
+  const primarySlug = primaryRadio.value;
+  const otherSlugs = Array.from(mergeSelection).filter(s => s !== primarySlug);
+  const primaryName = allRunnersData.find(r => r.slug === primarySlug)?.name || "this runner";
+  const otherNames = allRunnersData.filter(r => otherSlugs.includes(r.slug)).map(r => r.name).join(", ");
+  if(!confirm(`Merge ${otherNames} into ${primaryName}? Their run history will combine and the duplicate profile(s) will be deleted. This can't be undone.`)) return;
+
+  const btn = document.getElementById("confirmMergeBtn");
+  btn.disabled = true;
+  btn.textContent = "Merging…";
+  try{
+    const { error } = await sb.rpc("admin_merge_runners", {
+      p_primary_slug: primarySlug,
+      p_other_slugs: otherSlugs
+    });
+    if(error) throw error;
+    mergeSelection.clear();
+    document.getElementById("mergePanel").style.display = "none";
+    loadAdminData();
+  }catch(err){
+    alert("Something went wrong merging those runners. Please try again.");
+  }
+  btn.disabled = false;
+  btn.textContent = "Merge Selected";
+});
+
 function renderLogTable(log){
   if(log.length === 0){
     document.getElementById("logTableWrap").innerHTML = `<p style="color:var(--text-dim);font-size:13px;">No check-ins logged yet.</p>`;
     return;
   }
-  let html = `<table><thead><tr><th>Date</th><th>Name</th><th>Time</th><th>Source</th><th></th></tr></thead><tbody>`;
+  let html = `<table><thead><tr><th>Date</th><th>Name</th><th>Time</th><th>Source</th><th></th><th></th></tr></thead><tbody>`;
   log.forEach(entry => {
     const t = new Date(entry.time);
-    html += `<tr>
+    const badges = [];
+    if(entry.milestone) badges.push(`<span class="pill" style="background:rgba(255,47,208,.15);color:var(--pink);">🏆 ${entry.milestone}</span>`);
+    if(entry.club_milestone) badges.push(`<span class="pill" style="background:rgba(57,255,20,.15);color:var(--green);">🏆 Club ${entry.club_milestone}</span>`);
+    const isMilestoneRow = entry.milestone || entry.club_milestone;
+    html += `<tr${isMilestoneRow ? ' style="background:rgba(255,47,208,.05);"' : ''}>
       <td>${fmtDate(entry.date)}</td>
       <td>${esc(entry.name)}</td>
       <td>${t.toLocaleTimeString()}</td>
       <td>${entry.added_by_admin ? "Admin" : "Scan"}</td>
+      <td>${badges.join(" ")}</td>
       <td><button class="log-delete-btn" data-slug="${esc(entry.slug)}" data-date="${esc(entry.date)}" data-name="${esc(entry.name)}" title="Delete this attendance">✕</button></td>
     </tr>`;
   });
@@ -925,13 +1032,18 @@ manualAddBtn.addEventListener("click", async () => {
   try{
     // One RPC call does the duplicate check, the count increment, and the
     // log insert — and it's only callable by a logged-in admin.
-    const { error } = await sb.rpc("admin_add_attendance", {
+    const { data, error } = await sb.rpc("admin_add_attendance", {
       p_slug: manualSelectedSlug,
       p_date: manualDate.value
     });
     if(error) throw error;
+    const row = data && data[0];
     const addedName = manualName.value;
-    manualMsg.innerHTML = `<div class="msg info">Added ${esc(addedName)} for ${fmtDate(manualDate.value)}.</div>`;
+    const notes = [];
+    if(row && row.milestone) notes.push(`🏆 their ${row.milestone}th run`);
+    if(row && row.club_milestone) notes.push(`🏆 the club's ${row.club_milestone}th check-in ever`);
+    const milestoneNote = notes.length ? ` That's ${notes.join(" and ")} — a milestone!` : "";
+    manualMsg.innerHTML = `<div class="msg info">Added ${esc(addedName)} for ${fmtDate(manualDate.value)}.${milestoneNote}</div>`;
     manualName.value = "";
     manualSelectedSlug = null;
     manualDate.value = todayStr();
